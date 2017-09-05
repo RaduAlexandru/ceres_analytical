@@ -3,10 +3,12 @@
 #include <iostream>
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
-#include "bal_problem.h"
+#include "ceres_analytical/bal_problem.h"
 #include "ceres_analytical/snavely_reprojection_error.h"
 
 #include <chrono>
+
+#include <Eigen/Dense>
 
 using namespace ceres::examples;
 using namespace ceres;
@@ -42,9 +44,6 @@ int main(int argc, char** argv) {
   BuildProblem(&bal_problem, &problem);
 
 
-
-
-
   //solve
   std::chrono::high_resolution_clock::time_point t1_opt = std::chrono::high_resolution_clock::now();
   ceres::Solve(solver_options, &problem, &summary);
@@ -57,6 +56,10 @@ int main(int argc, char** argv) {
   // std::cout << summary.FullReport() << "\n";
 
   //report final parameters
+  // for (size_t i = 0; i < bal_problem.num_cameras(); i++) {
+  //
+  // }
+
 
 
   return 0;

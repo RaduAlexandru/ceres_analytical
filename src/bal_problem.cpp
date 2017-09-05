@@ -28,7 +28,7 @@
 //
 // Author: sameeragarwal@google.com (Sameer Agarwal)
 
-#include "bal_problem.h"
+#include "ceres_analytical/bal_problem.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -38,7 +38,7 @@
 #include "Eigen/Core"
 #include "ceres/rotation.h"
 #include "glog/logging.h"
-#include "random.h"
+#include "ceres_analytical/random.h"
 
 namespace ceres {
 namespace examples {
