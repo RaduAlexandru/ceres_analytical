@@ -15,6 +15,7 @@ using namespace ceres;
 
 
 void BuildProblem(BALProblem* bal_problem, Problem* problem);
+void report_camera_parameters(BALProblem& bal_problem);
 
 
 
@@ -55,30 +56,9 @@ int main(int argc, char** argv) {
   std::cout << "total took " << duration_opt * 1e-6<< " s " << std::endl;
   // std::cout << summary.FullReport() << "\n";
 
-  //report final parameters
-  double* cameras = bal_problem.mutable_cameras();
-  const int camera_block_size = bal_problem.camera_block_size();  //camera is 9 parameters
-  for (size_t i = 0; i < bal_problem.num_cameras(); i++) {
-    double* camera = cameras + camera_block_size * i;
 
-
-    //get rotation part
-    double rotation_mat_flattened[9];
-    AngleAxisToRotationMatrix(camera,rotation_mat_flattened);
-    Eigen::Matrix3d R= Eigen::Map<Eigen::Matrix3d >(rotation_mat_flattened);
-
-    //get translation part
-    Eigen::Vector3d T ( camera[3], camera[4], camera[5]);
-
-    // //combine them
-    Eigen::Matrix4d Trans; // Your Transformation Matrix
-    Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
-    Trans.block<3,3>(0,0) = R;
-    Trans.block<3,1>(0,3)= T;
-
-    std::cout << "Transformation matrix is" << std::endl << Trans << '\n';
-  }
-
+  //report camera parameters
+  report_camera_parameters(bal_problem);
 
 
 
@@ -112,4 +92,39 @@ void BuildProblem(BALProblem* bal_problem, Problem* problem) {
     double* point = points + point_block_size * bal_problem->point_index()[i];
     problem->AddResidualBlock(cost_function, NULL, camera, point);
   }
+}
+
+// void BuildProblemAnalytical(BALProblem* bal_problem, Problem* problem){
+//
+// }
+
+
+void report_camera_parameters(BALProblem& bal_problem){
+
+  //report final parameters
+  double* cameras = bal_problem.mutable_cameras();
+  const int camera_block_size = bal_problem.camera_block_size();  //camera is 9 parameters
+  for (size_t i = 0; i < bal_problem.num_cameras(); i++) {
+    double* camera = cameras + camera_block_size * i;
+
+
+    //get rotation part
+    double rotation_mat_flattened[9];
+    AngleAxisToRotationMatrix(camera,rotation_mat_flattened);
+    Eigen::Matrix3d R= Eigen::Map<Eigen::Matrix3d >(rotation_mat_flattened);
+
+    //get translation part
+    Eigen::Vector3d T ( camera[3], camera[4], camera[5]);
+
+    // //combine them
+    Eigen::Matrix4d Trans; // Your Transformation Matrix
+    Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
+    Trans.block<3,3>(0,0) = R;
+    Trans.block<3,1>(0,3)= T;
+
+    std::cout << "Transformation matrix is" << std::endl << Trans << '\n';
+  }
+
+
+
 }
