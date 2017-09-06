@@ -5,6 +5,7 @@
 #include "ceres/rotation.h"
 #include "ceres_analytical/bal_problem.h"
 #include "ceres_analytical/snavely_reprojection_error.h"
+#include "ceres_analytical/projection_analytical_error.h"
 
 #include <chrono>
 
@@ -15,6 +16,7 @@ using namespace ceres;
 
 
 void BuildProblem(BALProblem* bal_problem, Problem* problem);
+void BuildProblemAnalytical(BALProblem* bal_problem, Problem* problem);
 void report_camera_parameters(BALProblem& bal_problem);
 
 
@@ -36,13 +38,14 @@ int main(int argc, char** argv) {
 
 
   //READ file
-  BALProblem bal_problem(argv[1],false); //Second argument is for using quaternions or not
+  BALProblem bal_problem(argv[1],true); //Second argument is for using quaternions or not
 
 
   //create problem
   Problem problem(problem_options);
   bal_problem.Normalize(); //TODO check if necesary
   BuildProblem(&bal_problem, &problem);
+  // BuildProblemAnalytical(&bal_problem, &problem);
 
 
   //solve
@@ -59,6 +62,10 @@ int main(int argc, char** argv) {
 
   //report camera parameters
   report_camera_parameters(bal_problem);
+
+
+  //Write to ply file
+  bal_problem.WriteToPLYFile("result.ply");
 
 
 
@@ -81,8 +88,8 @@ void BuildProblem(BALProblem* bal_problem, Problem* problem) {
     CostFunction* cost_function;
     // Each Residual block takes a point and a camera as input and
     // outputs a 2 dimensional residual.
-    cost_function = SnavelyReprojectionError::Create(observations[2 * i + 0],
-                                                     observations[2 * i + 1]);
+    cost_function = SnavelyReprojectionErrorWithQuaternions::Create(observations[2 * i + 0],
+                                                                    observations[2 * i + 1]);
 
 
     // Each observation correponds to a pair of a camera and a point
@@ -91,12 +98,50 @@ void BuildProblem(BALProblem* bal_problem, Problem* problem) {
     double* camera = cameras + camera_block_size * bal_problem->camera_index()[i];
     double* point = points + point_block_size * bal_problem->point_index()[i];
     problem->AddResidualBlock(cost_function, NULL, camera, point);
+
+
+    // std::cout << "adding residual block" << '\n';
+
+
   }
+
+
+  //Set parametrization for quaternion
+  LocalParameterization* camera_parameterization =
+  new ProductParameterization( new QuaternionParameterization(),
+                               new IdentityParameterization(6));
+  for (int i = 0; i < bal_problem->num_cameras(); ++i) {
+    problem->SetParameterization(cameras + camera_block_size * i,
+                                 camera_parameterization);
+
+  }
+
+
 }
 
-// void BuildProblemAnalytical(BALProblem* bal_problem, Problem* problem){
-//
-// }
+void BuildProblemAnalytical(BALProblem* bal_problem, Problem* problem){
+
+  const int point_block_size = bal_problem->point_block_size();    //point is 3 parameters
+  const int camera_block_size = bal_problem->camera_block_size();  //camera is 9 parameters
+  double* points = bal_problem->mutable_points();
+  double* cameras = bal_problem->mutable_cameras();
+  const double* observations = bal_problem->observations();
+
+  for (int i = 0; i < bal_problem->num_observations(); ++i) {
+    CostFunction* cost_function;
+    cost_function = new ProjectionAnalyticalError(observations[2 * i + 0],
+                                                  observations[2 * i + 1]);
+
+
+    // // Each observation correponds to a pair of a camera and a point
+    // // which are identified by camera_index()[i] and point_index()[i]
+    // // respectively.
+    double* camera = cameras + camera_block_size * bal_problem->camera_index()[i];
+    double* point = points + point_block_size * bal_problem->point_index()[i];
+    problem->AddResidualBlock(cost_function, NULL, camera, point);
+  }
+
+}
 
 
 void report_camera_parameters(BALProblem& bal_problem){
