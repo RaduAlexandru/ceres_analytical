@@ -132,6 +132,7 @@ struct SnavelyReprojectionErrorWithQuaternions {
     p[1] += camera[5];
     p[2] += camera[6];
 
+
     // Compute the center of distortion. The sign change comes from
     // the camera model that Noah Snavely's Bundler assumes, whereby
     // the camera coordinate system has a negative z axis.

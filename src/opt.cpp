@@ -6,6 +6,7 @@
 #include "ceres_analytical/bal_problem.h"
 #include "ceres_analytical/snavely_reprojection_error.h"
 #include "ceres_analytical/projection_analytical_error.h"
+#include "ceres_analytical/reprojection_error_without_intrinsics.h"
 
 #include <chrono>
 
@@ -17,6 +18,9 @@ using namespace ceres;
 
 void BuildProblem(BALProblem* bal_problem, Problem* problem);
 void BuildProblemAnalytical(BALProblem* bal_problem, Problem* problem);
+
+void BuildProblemWithoutIntrinsics(BALProblem* bal_problem, Problem* problem);
+
 void report_camera_parameters(BALProblem& bal_problem);
 
 
@@ -44,7 +48,11 @@ int main(int argc, char** argv) {
   //create problem
   Problem problem(problem_options);
   bal_problem.Normalize(); //TODO check if necesary
-  BuildProblem(&bal_problem, &problem);
+  // BuildProblem(&bal_problem, &problem);
+  BuildProblemWithoutIntrinsics(&bal_problem, &problem);  //optimizes a problem only over poses and points, without the instrinsics of the camera
+  // BuildProblemWithoutIntrinsicsSophus(&bal_problem, &problem);   //optimizes only poses and points, using sophus and eigen
+  // BuildProblemWithoutIntrinsicsSophusAnalytical(&bal_problem, &problem);  //optimizes poses, points, using sophus with analytical jacobian
+  // BuildProblemSophus(&bal_problem, &problem);  //builds problem using sophus
   // BuildProblemAnalytical(&bal_problem, &problem);
 
 
@@ -57,11 +65,11 @@ int main(int argc, char** argv) {
   //report summaries and time
   auto duration_opt = std::chrono::duration_cast<std::chrono::microseconds>( t2_opt - t1_opt ).count();
   std::cout << "total took " << duration_opt * 1e-6<< " s " << std::endl;
-  // std::cout << summary.FullReport() << "\n";
+  std::cout << summary.FullReport() << "\n";
 
 
   //report camera parameters
-  report_camera_parameters(bal_problem);
+  // report_camera_parameters(bal_problem);
 
 
   //Write to ply file
@@ -143,6 +151,47 @@ void BuildProblemAnalytical(BALProblem* bal_problem, Problem* problem){
 
 }
 
+void BuildProblemWithoutIntrinsics(BALProblem* bal_problem, Problem* problem){
+
+  const int point_block_size = bal_problem->point_block_size();    //point is 3 parameters
+  const int camera_block_size = bal_problem->camera_block_size();  //camera is 9 parameters
+  double* points = bal_problem->mutable_points();
+  double* cameras = bal_problem->mutable_cameras();
+  const double* observations = bal_problem->observations();
+
+  for (int i = 0; i < bal_problem->num_observations(); ++i) {
+    Eigen::Vector2d obs={observations[2 * i + 0], observations[2 * i + 1]};
+
+    CostFunction* cost_function;
+    cost_function = ReprojectionErrorWithoutIntrinsics::Create(obs);
+
+
+    // // Each observation correponds to a pair of a camera and a point
+    // // which are identified by camera_index()[i] and point_index()[i]
+    // // respectively.
+    double* cam_pose = cameras + camera_block_size * bal_problem->camera_index()[i];
+    double* point = points + point_block_size * bal_problem->point_index()[i];
+    double* cam_intrinsics = cameras + camera_block_size * bal_problem->camera_index()[i] + 7;  //move +7 because of the quat paramerization
+    problem->AddResidualBlock(cost_function, NULL, cam_pose, point, cam_intrinsics);
+
+    problem->SetParameterBlockConstant(cam_intrinsics);
+  }
+
+
+  //TODO recheck if its correct
+  //Set parametrization for quaternion
+  LocalParameterization* camera_parameterization =
+  new ProductParameterization( new QuaternionParameterization(),
+                               new IdentityParameterization(3));
+  for (int i = 0; i < bal_problem->num_cameras(); ++i) {
+    problem->SetParameterization(cameras + camera_block_size * i,
+                                 camera_parameterization);
+
+  }
+
+}
+
+
 
 void report_camera_parameters(BALProblem& bal_problem){
 
@@ -155,11 +204,11 @@ void report_camera_parameters(BALProblem& bal_problem){
 
     //get rotation part
     double rotation_mat_flattened[9];
-    AngleAxisToRotationMatrix(camera,rotation_mat_flattened);
+    QuaternionToRotation(camera,rotation_mat_flattened);
     Eigen::Matrix3d R= Eigen::Map<Eigen::Matrix3d >(rotation_mat_flattened);
 
     //get translation part
-    Eigen::Vector3d T ( camera[3], camera[4], camera[5]);
+    Eigen::Vector3d T ( camera[4], camera[5], camera[6]);
 
     // //combine them
     Eigen::Matrix4d Trans; // Your Transformation Matrix
