@@ -21,18 +21,28 @@ obs_x, obs_y= symbols('obs_x obx_y')
 
 #-----------------------------
 
+#get unit quat
+scale = 1.0 / sqrt( q[0] * q[0] +
+                    q[1] * q[1] +
+                    q[2] * q[2] +
+                    q[3] * q[3]);
+u_q=Matrix([scale * q[0],
+            scale * q[1],
+            scale * q[2],
+            scale * q[3]])
+
 
 
 #rotate
-t2 =  q[0] * q[1];
-t3 =  q[0] * q[2];
-t4 =  q[0] * q[3];
-t5 = -q[1] * q[1];
-t6 =  q[1] * q[2];
-t7 =  q[1] * q[3];
-t8 = -q[2] * q[2];
-t9 =  q[2] * q[3];
-t1 = -q[3] * q[3];
+t2 =  u_q[0] * u_q[1];
+t3 =  u_q[0] * u_q[2];
+t4 =  u_q[0] * u_q[3];
+t5 = -u_q[1] * u_q[1];
+t6 =  u_q[1] * u_q[2];
+t7 =  u_q[1] * u_q[3];
+t8 = -u_q[2] * u_q[2];
+t9 =  u_q[2] * u_q[3];
+t1 = -u_q[3] * u_q[3];
 p3d_rot=Matrix([ 2* ((t8 + t1) * p3d[0] + (t6 - t4) * p3d[1] + (t3 + t7) * p3d[2]) + p3d[0],
                  2 * ((t4 + t6) * p3d[0] + (t5 + t1) * p3d[1] + (t9 - t2) * p3d[2]) + p3d[1],
                  2 * ((t7 - t3) * p3d[0] + (t2 + t9) * p3d[1] + (t5 + t8) * p3d[2]) + p3d[2]])

@@ -52,6 +52,8 @@ int main(int argc, char** argv) {
   BuildProblemWithoutIntrinsics(&bal_problem, &problem);  //optimizes a problem only over poses and points, without the instrinsics of the camera
   // BuildProblemWithoutIntrinsicsSophus(&bal_problem, &problem);   //optimizes only poses and points, using sophus and eigen
   // BuildProblemWithoutIntrinsicsSophusAnalytical(&bal_problem, &problem);  //optimizes poses, points, using sophus with analytical jacobian
+
+
   // BuildProblemSophus(&bal_problem, &problem);  //builds problem using sophus
   // BuildProblemAnalytical(&bal_problem, &problem);
 
@@ -175,6 +177,15 @@ void BuildProblemWithoutIntrinsics(BALProblem* bal_problem, Problem* problem){
     problem->AddResidualBlock(cost_function, NULL, cam_pose, point, cam_intrinsics);
 
     problem->SetParameterBlockConstant(cam_intrinsics);
+
+
+    // std::cout << "num residuals " << cost_function->num_residuals() << '\n';
+    // std::cout << "number of parameter blocks " << cost_function->parameter_block_sizes().size() << '\n';  //Is 3 because we have 3 parameter blocks (pose,point3d,intrisnics)
+    // std::cout << "size of first parameter block " << cost_function->parameter_block_sizes()[0] << "\n";
+    // std::cout << "size of second parameter block " << cost_function->parameter_block_sizes()[1] << "\n";
+    // std::cout << "size of third parameter block " << cost_function->parameter_block_sizes()[2] << "\n";
+    // std::cout  << '\n';
+
   }
 
 
