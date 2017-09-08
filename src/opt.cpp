@@ -222,8 +222,8 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
     Eigen::Vector2d obs={observations[2 * i + 0], observations[2 * i + 1]};
 
     CostFunction* cost_function;
-    cost_function = ReprojectionErrorWithoutIntrinsics::Create(obs);
-    // cost_function = new ErrorAnalytical(obs);
+    // cost_function = ReprojectionErrorWithoutIntrinsics::Create(obs);
+    cost_function = new ErrorAnalytical(obs);
 
 
     // // Each observation correponds to a pair of a camera and a point
@@ -234,7 +234,9 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
     double* cam_intrinsics = cameras + camera_block_size * bal_problem->camera_index()[i] + 7;  //move +7 because of the quat paramerization
     problem->AddResidualBlock(cost_function, NULL, cam_pose, point, cam_intrinsics);
 
+    // problem->SetParameterBlockConstant(point);
     problem->SetParameterBlockConstant(cam_intrinsics);
+    problem->SetParameterBlockConstant(cam_pose);
 
 
     // std::cout << "num residuals " << cost_function->num_residuals() << '\n';

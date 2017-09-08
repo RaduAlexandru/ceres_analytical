@@ -79,14 +79,17 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
     // The error is the difference between the predicted and observed position.
     residuals[0] = predicted_x - observed_x;
     residuals[1] = predicted_y - observed_y;
-    std::cout << " residual is " << residuals[0] << ", " << residuals[1] << '\n';
+    // std::cout << " residual is " << residuals[0] << ", " << residuals[1] << '\n';
 
 
     //Blanco's notation
     double f=focal;
-    double gx=p3d_global[0];
-    double gy=p3d_global[1];
-    double gz=p3d_global[2];
+    // double gx=p3d_global[0];
+    // double gy=p3d_global[1];
+    // double gz=p3d_global[2];
+    double gx=p3d_local[0];
+    double gy=p3d_local[1];
+    double gz=p3d_local[2];
     double gx2=gx*gx;
     double gy2=gy*gy;
     double gz2=gz*gz;
@@ -106,25 +109,67 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
 
 
     Eigen::MatrixXd jacobian_point(2,3);
-    jacobian_point(0,0)=f/gz;
-    jacobian_point(0,0)=0.0;
-    jacobian_point(0,0)=-f*(gx/gz2);
-
-    jacobian_point(0,0)=0.0;
-    jacobian_point(0,0)=f/gz;
-    jacobian_point(0,0)=-f*(gx/gz2);
-    jacobian_point=jacobian_point*R;
-
-    std::cout << "jacobian point is " << std::endl << jacobian_point << '\n';
+    // jacobian_point(0,0)=f/gz;
+    // jacobian_point(0,1)=0.0;
+    // jacobian_point(0,2)=-f*gx/gz2;
+    //
+    // jacobian_point(1,0)=0.0;
+    // jacobian_point(1,1)=f/gz;
+    // jacobian_point(1,2)=-f*gx/gz2;
+    // jacobian_point=jacobian_point*R;
 
 
-    Eigen::MatrixXd local_j(7,6);
-    local_j.block<6,6>(0,0)=Eigen::MatrixXd::Identity(6,6);
-    std::cout << "local j"  << std::endl << local_j << '\n';
+    // //orbslam one
+    jacobian_point(0,0)=f;
+    jacobian_point(0,1)=0.0;
+    jacobian_point(0,2)=-gx/gz*f;
+
+    jacobian_point(1,0)=0.0;
+    jacobian_point(1,1)=f;
+    jacobian_point(1,2)=-gy/gz*f;
+    jacobian_point= -1.0/gz * jacobian_point*R;
+
+
+    //sympy one (fucking works!!)
+//     double p3d_x=p3d_global[0];
+//     double p3d_y=p3d_global[1];
+//     double p3d_z=p3d_global[2];
+//     double t_x=parameters[0][4];
+//     double t_y=parameters[0][5];
+//     double t_z=parameters[0][6];
+//     //x
+//     jacobian_point(0,0)=-R(2,0)*f*(-p3d_x - R(0,1)*p3d_y - R(0,2)*p3d_z - t_x)/std::pow((R(2,0)*p3d_x + R(2,1)*p3d_y + R(2,2)*p3d_z + t_z),2) - f/(R(2,0)*p3d_x + R(2,1)*p3d_y + 9*p3d_z + t_z);
+//     jacobian_point(1,0)=-R(2,0)*f*(-R(1,0)*p3d_x - R(1,1)*p3d_y - R(1,2)*p3d_z - t_y)/std::pow((R(1,0)*p3d_x + R(2,1)*p3d_y +
+// R(2,2)*p3d_z + t_z),2) - R(1,0)*f/(R(2.0)*p3d_x + R(2,1)*p3d_y + R(2,2)*p3d_z + t_z);
+//     //y
+//     jacobian_point(0,1)=-R(2,1)*f*(-p3d_x - R(0,1)*p3d_y - R(0,2)*p3d_z - t_x)/std::pow((R(2,0)*p3d_x + R(2,1)*p3d_y + R(2,2)*p3d_z + t_z),2) - R(0,1)*f/(R(2,0)*p3d_x + R(2,1)*p3d_y + R(2,2)*p3d_z + t_z);
+//     jacobian_point(1,1)=-R(2,1)*f*(-R(1,0)*p3d_x - R(1,1)*p3d_y - R(1,2)*p3d_z - t_y)/std::pow((R(2,0)*p3d_x + R(2,1)*p3d_y
+// + R(2,2)*p3d_z + t_z),2) - R(1,1)*f/(R(2,0)*p3d_x + R(2,1)*p3d_y + R(2,2)*p3d_z + t_z);
+//     //z
+//     jacobian_point(0,2)=-R(2,2)*f*(-p3d_x - R(0,1)*p3d_y - R(0,2)*p3d_z - t_x)/std::pow((R(2,0)*p3d_x + R(2,1)*p3d_y + R(2,2)*p3d_z + t_z),2) - R(0,2)*f/(R(2,0)*p3d_x + R(2,1)*p3d_y + R(2,2)*p3d_z + t_z);
+//     jacobian_point(1,2)=-R(2,2)*f*(-R(1,0)*p3d_x - R(1,1)*p3d_y - R(1,2)*p3d_z - t_y)/std::pow((R(2,0)*p3d_x + R(2,1)*p3d_y
+// + R(2,2)*p3d_z + t_z),2) - R(1,2)*f/(R(2,0)*p3d_x + R(2,1)*p3d_y + R(2,2)*p3d_z + t_z);
+
+
+      //blanco one but with the local point  (also works but the last cost is not as good as the sympy one)
+      // jacobian_point(0,0)=f/p3d_local[2];
+      // jacobian_point(0,1)=0.0;
+      // jacobian_point(0,2)=-f*p3d_local[0]/(p3d_local[2]*p3d_local[2]);
+      //
+      // jacobian_point(1,0)=0.0;
+      // jacobian_point(1,1)=f/p3d_local[2];
+      // jacobian_point(1,2)=-f*p3d_local[0]/(p3d_local[2]*p3d_local[2]);
+      // jacobian_point=jacobian_point*R;
+
+
+
+
+
+    // std::cout << "jacobian point is " << std::endl << jacobian_point << '\n';
 
 
     if (jacobians != NULL && jacobians[0] != NULL) {
-      std::cout << "computing jacobian" << '\n';
+      // std::cout << "computing jacobian" << '\n';
 
       //jacobian of camera_pose is of size 2x7 , fill in a row majow order jacobians[0][0...13]
       jacobians[0][0] = f/gz;
@@ -133,16 +178,44 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
       jacobians[0][3] = -f*( (gx*gy) /gz2 );
       jacobians[0][4] = f*( 1.0 +  gx2/gz2 );
       jacobians[0][5] = -f*( gy/gz );
-
       jacobians[0][6] = 0.0;
-      jacobians[0][7] = f/gz;
-      jacobians[0][8] = -f*(gy/gz2);
-      jacobians[0][9] = -f*(1.0+ (gy2/gz2) );
-      jacobians[0][10] = f*( (gx*gy)/gz2) ;
-      jacobians[0][11] = f* (gx/gz);
+
+      jacobians[0][7] = 0.0;
+      jacobians[0][8] = f/gz;
+      jacobians[0][9] = -f*(gy/gz2);
+      jacobians[0][10] = -f*(1.0+ (gy2/gz2) );
+      jacobians[0][11] = f*( (gx*gy)/gz2) ;
+      jacobians[0][12] = f* (gx/gz);
+      jacobians[0][13] = 0.0;
+
+
+      // //the orblam one
+      // jacobians[0][0] = gx*gy/gz2 *f;
+      // jacobians[0][1] = -(1+(gx*gx/gz2)) *f;
+      // jacobians[0][2] = gy/gz *f;
+      // jacobians[0][3] = -1./gz *f;
+      // jacobians[0][4] = 0;
+      // jacobians[0][5] = gx/gz2 *f;
+      // jacobians[0][6] = 0.0;
+      //
+      // jacobians[0][6] = (1+gy*gy/gz2) *f;
+      // jacobians[0][7] = -gx*gy/gz2 *f;
+      // jacobians[0][8] = -gx/gz *f;
+      // jacobians[0][9] = 0;
+      // jacobians[0][10] = -1./gz *f ;
+      // jacobians[0][11] = gy/gz *f;
+      // jacobians[0][13] = 0.0;
+
+
+
+
+
+      // Eigen::Map<Eigen::Matrix<double,2,7,Eigen::RowMajor> > M(jacobians[0]);
+      // std::cout << "jacobian of quaternion is " << std::endl << M << '\n';
     }
 
     if (jacobians != NULL && jacobians[1] != NULL) {
+      // std::cout << "computing jacobian point" << '\n';
 
       //jacobian of p3d is of size 2x3 , fill in a row majow order jacobians[0][0...5]
       jacobians[1][0] = jacobian_point(0,0);
@@ -155,6 +228,13 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
 
 
     }
+
+    if (jacobians != NULL && jacobians[2] != NULL) {
+
+      std::cout << "requiring jacobians of camera instrinsics" << '\n';
+
+    }
+
     return true;
   }
 
