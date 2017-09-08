@@ -101,6 +101,8 @@ struct ReprojectionErrorWithoutIntrinsics {
     residuals[0] = predicted_x - observed_x;
     residuals[1] = predicted_y - observed_y;
 
+      // std::cout << " residual is " << residuals[0] << ", " << residuals[1] << '\n';
+
 
     return true;
   }

@@ -129,5 +129,6 @@ add_definitions(-DCERES_GFLAGS_NAMESPACE=${GFLAGS_NAMESPACE})
 
 add_executable(opt
                ${PROJECT_SOURCE_DIR}/opt.cpp
-                ${PROJECT_SOURCE_DIR}/bal_problem.cpp)
+               ${PROJECT_SOURCE_DIR}/bal_problem.cpp
+               ${PROJECT_SOURCE_DIR}/custom_pose_parametrization.cpp)
 target_link_libraries(opt ceres ${GFLAGS_LIBRARIES})
