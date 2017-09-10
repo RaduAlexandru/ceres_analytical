@@ -6,6 +6,7 @@
 #include "ceres/internal/scoped_ptr.h"
 #include "ceres/internal/disable_warnings.h"
 #include "ceres/local_parameterization.h"
+#include "ceres_analytical/custom_local_parametrization.h"
 
 
 #include <algorithm>

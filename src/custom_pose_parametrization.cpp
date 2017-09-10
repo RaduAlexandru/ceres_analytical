@@ -7,6 +7,8 @@ namespace ceres{
                                         double* x_plus_delta) const {
 
     //for the first part of x (corresponding to the quaternion)
+    // std::cout << "custom: delta rot is " << delta[0] << " " << delta[1] << " "<< delta[2] << '\n';
+    // std::cout << "custom: delta trans is " << delta[3] << " " << delta[4] << " "<< delta[5] << '\n';
     const double norm_delta =
         sqrt(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
     if (norm_delta > 0.0) {
@@ -22,6 +24,32 @@ namespace ceres{
         x_plus_delta[i] = x[i];
       }
     }
+
+
+    // //new implementation of the plus of a quaternion http://citeseerx.ist.psu.edu/viewdoc/download?rep=rep1&type=pdf&doi=10.1.1.132.20
+    // //also the same used in line 330 of Sophus https://github.com/strasdat/Sophus/blob/master/sophus/so3.hpp
+    // const double theta = sqrt(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
+    // // std::cout << "delta is " << delta[0] << " " << delta[1] << " "<< delta[2] << '\n';
+    // if (theta >std::numeric_limits<double>::epsilon()){
+    //   double q_delta[4];
+    //   q_delta[0]=cos( (1.0/2.0) * theta);
+    //   q_delta[1]=sin((1.0/2.0)*theta)/theta*delta[1];
+    //   q_delta[2]=sin((1.0/2.0)*theta)/theta*delta[2];
+    //   q_delta[3]=sin((1.0/2.0)*theta)/theta*delta[3];
+    //   QuaternionProduct(q_delta, x, x_plus_delta);
+    // } else {
+    //   for (int i = 0; i < 4; ++i) {
+    //     x_plus_delta[i] = x[i];
+    //   }
+    // }
+
+
+    //my own imlementation
+    // double q_delta[4];
+    // AngleAxisToQuaternion(delta,q_delta);
+    // QuaternionProduct(q_delta, x, x_plus_delta);
+
+
 
 
     //second part of x corresponding to the translation
@@ -68,13 +96,9 @@ namespace ceres{
     j_eigen.setZero();
     j_eigen.block(0,0,6,6)=Eigen::MatrixXd::Identity(6,6);
     //
-    // // std::cout << "j eigen is " << j_eigen << '\n';
+    // std::cout << "j eigen is " << j_eigen << '\n';
     //
-    // std::cout << "jacobian is" << '\n';
-    // for (size_t i = 0; i < 16; i++) {
-    //   std::cout << "j= " << i << " is: "<< jacobian[i] << '\n';
-    // }
-    // std::cout << '\n';
+
 
 
 
@@ -87,5 +111,6 @@ namespace ceres{
     // jacobian[9] =  0; jacobian[10] = 0; jacobian[11] =  0;  // NOLINT
     return true;
   }
+
 
 }

@@ -11,6 +11,7 @@
 #include "ceres_analytical/error_analytical.h"
 
 #include "ceres_analytical/custom_pose_parametrization.h"
+#include "ceres_analytical/custom_local_parametrization.h"
 
 #include <chrono>
 
@@ -236,7 +237,7 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
 
     // problem->SetParameterBlockConstant(point);
     problem->SetParameterBlockConstant(cam_intrinsics);
-    problem->SetParameterBlockConstant(cam_pose);
+    // problem->SetParameterBlockConstant(cam_pose);
 
 
     // std::cout << "num residuals " << cost_function->num_residuals() << '\n';
