@@ -21,10 +21,7 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
   virtual bool Evaluate(double const* const* parameters,
                         double* residuals,
                         double** jacobians) const {
-    // double w_x = parameters[0][0];
-    // double w_x = parameters[0][0];
-    // double w_x = parameters[0][0];
-
+    
     double p3d_local[3]; //resulting point after rotation and translation in the local camera frame
     double p3d_global[3]={parameters[1][0],parameters[1][1],parameters[1][2]};  //3D points that needs to be rotated
     double qvec[4] = { parameters[0][0], parameters[0][1], parameters[0][2], parameters[0][3] };  //Swap the w if it's an eigen quaternion
@@ -260,12 +257,16 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
       MatrixRef j_eigen(jacobians[0], 2, 7);
       j_eigen.setZero();
       // j_eigen.block(0,0,2,3)=jacobian_point;
-      p3d_local[0] = 2 * ((t8 + t1) * p3d_global[0] + (t6 - t4) * p3d_global[1] + (t3 + t7) * p3d_global[2]) + p3d_global[0];  // NOLINT
-      p3d_local[1] = 2 * ((t4 + t6) * p3d_global[0] + (t5 + t1) * p3d_global[1] + (t9 - t2) * p3d_global[2]) + p3d_global[1];  // NOLINT
-      p3d_local[2] = 2 * ((t7 - t3) * p3d_global[0] + (t2 + t9) * p3d_global[1] + (t5 + t8) * p3d_global[2]) + p3d_global[2];  // NOLINT
+      // p3d_local[0] = 2 * ((t8 + t1) * p3d_global[0] + (t6 - t4) * p3d_global[1] + (t3 + t7) * p3d_global[2]) + p3d_global[0];  // NOLINT
+      // p3d_local[1] = 2 * ((t4 + t6) * p3d_global[0] + (t5 + t1) * p3d_global[1] + (t9 - t2) * p3d_global[2]) + p3d_global[1];  // NOLINT
+      // p3d_local[2] = 2 * ((t7 - t3) * p3d_global[0] + (t2 + t9) * p3d_global[1] + (t5 + t8) * p3d_global[2]) + p3d_global[2];  // NOLINT
       // Eigen::Vector3d g={p3d_global[0],p3d_global[1],p3d_global[2]};
-      Eigen::Vector3d g={p3d_local[0],p3d_local[1],p3d_local[2]};
       Eigen::Vector3d camera_trans={parameters[0][4],parameters[0][5],parameters[0][6]};
+      p3d_local[0] -= camera_trans[0];
+      p3d_local[1] -= camera_trans[1];
+      p3d_local[2] -= camera_trans[2];
+      Eigen::Vector3d g={p3d_local[0],p3d_local[1],p3d_local[2]};
+
       // std::cout << "g local is " << g << '\n';
       // std::cout << "camera transi is" << camera_trans << '\n';
       Eigen::Matrix3d g_hat;
@@ -281,7 +282,7 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
       // right_side.block(0,0,3,3)=Eigen::Matrix3d::Identity();
       // right_side.block(0,3,3,3)=g_hat;
 
-      right_side.block(0,0,3,3)=-g_hat;
+      right_side.block(0,0,3,3)=-g_hat*2;
       right_side.block(0,3,3,3)=Eigen::Matrix3d::Identity();
       // std::cout << "jacobian point is " << std::endl << jacobian_point << '\n';
       // std::cout << "righ side" << std::endl << right_side << '\n';
@@ -341,8 +342,8 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
       //   std::cout << "FUCK YES" << '\n';
       // }
 
-      Eigen::Map<Eigen::Matrix<double,2,7,Eigen::RowMajor> > M(jacobians[0]);
-      std::cout << "jacobian of quaternion is " << std::endl << M << '\n';
+      // Eigen::Map<Eigen::Matrix<double,2,7,Eigen::RowMajor> > M(jacobians[0]);
+      // std::cout << "jacobian of quaternion is " << std::endl << M << '\n';
       //
       //
       // Eigen::MatrixXd parametrization(7,6);
@@ -394,7 +395,7 @@ class ErrorAnalytical : public SizedCostFunction<2, /* number of residuals */
 
     }
 
-    exit(1);
+    // exit(1);
     return true;
   }
 
