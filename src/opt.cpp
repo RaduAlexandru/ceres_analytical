@@ -41,10 +41,12 @@ int main(int argc, char** argv) {
   ceres::Solver::Options solver_options;
   solver_options.linear_solver_type = ceres::DENSE_SCHUR;
   solver_options.minimizer_progress_to_stdout = true;
+  // solver_options.use_explicit_schur_complement = true;
+  // solver_options.num_threads=4;
 
   //problem options
   Problem::Options problem_options;
-  // problem_options.disable_all_safety_checks=true; //Gain 5% in speed
+  problem_options.disable_all_safety_checks=true; //Gain 5% in speed
 
 
   //READ file
@@ -225,7 +227,8 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
     CostFunction* cost_function;
     // cost_function = ReprojectionErrorWithoutIntrinsics::Create(obs);
     // cost_function = new ErrorAnalytical(obs);
-    cost_function = ErrorAnalyticalWithDistortion::Create(obs);
+    // cost_function = ErrorAnalyticalWithDistortion::Create(obs);  //distorsion is autodiff, rest is analytica
+    cost_function = new ErrorAnalyticalOpt(obs); // same as error analytical but more optimized and whithout eigen
 
 
     // // Each observation correponds to a pair of a camera and a point
@@ -237,7 +240,7 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
     problem->AddResidualBlock(cost_function, NULL, cam_pose, point, cam_intrinsics);
 
     // problem->SetParameterBlockConstant(point);
-    // problem->SetParameterBlockConstant(cam_intrinsics);
+    problem->SetParameterBlockConstant(cam_intrinsics);
     // problem->SetParameterBlockConstant(cam_pose);
 
 

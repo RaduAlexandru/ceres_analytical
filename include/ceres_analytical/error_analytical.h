@@ -137,6 +137,132 @@ private:
 
 
 
+class ErrorAnalyticalOpt : public SizedCostFunction<2, /* number of residuals */
+                             7, /* size of first parameter, corresponding to the camera pose */
+                             3, /* size of the second parameter corresponding to the point*/
+                             CAMERA_NR_INTRINSICS /* size of the second parameter corresponding to the intrinsics*/> {
+ public:
+   ErrorAnalyticalOpt(const Eigen::Vector2d & point2D) : observed_x(point2D(0)), observed_y(point2D(1)) {}
+  virtual ~ErrorAnalyticalOpt() {}
+  virtual bool Evaluate(double const* const* parameters,
+                        double* residuals,
+                        double** jacobians) const {
+
+    double p3d_only_rot[3]; //resulting point after only rotation but NOT translating
+    double p3d_local[3]; //resulting point after rotation and translation in the local camera frame
+    double p3d_global[3]={parameters[1][0],parameters[1][1],parameters[1][2]};  //3D points in world frame
+    double qvec[4] = { parameters[0][0], parameters[0][1], parameters[0][2], parameters[0][3] };  //Swap the w if it's an eigen quaternion
+
+    //rotate
+    QuaternionRotatePoint(qvec,p3d_global,p3d_only_rot);
+
+    // camera[3,4,5] are the translation.
+    p3d_local[0] = p3d_only_rot[0]+ parameters[0][4];
+    p3d_local[1] = p3d_only_rot[1]+ parameters[0][5];
+    p3d_local[2] = p3d_only_rot[2]+ parameters[0][6];
+
+
+    //Normalize to image plane.
+    double xp = - p3d_local[0] / p3d_local[2];
+    double yp = - p3d_local[1] / p3d_local[2];
+
+
+    //NO DISTORSION
+    //TODO
+    double distortion=1.0;
+
+    // Compute final projected point position.
+    double focal =parameters[2][0];
+    double predicted_x = focal * distortion * xp;
+    double predicted_y = focal * distortion * yp;
+
+
+    // The error is the difference between the predicted and observed position.
+    residuals[0] = predicted_x - observed_x;
+    residuals[1] = predicted_y - observed_y;
+    // std::cout << " residual is " << residuals[0] << ", " << residuals[1] << '\n';
+
+
+    //Blanco's notation
+    double f=focal;
+    double R_array[9];
+    QuaternionToRotation(qvec,R_array);
+
+
+    //precompute stuff
+    double _z=-f/ p3d_local[2];
+    double z_2=p3d_local[2]*p3d_local[2];
+    double x_z=f*p3d_local[0]/ z_2;
+    double y_z=f*p3d_local[1]/ z_2;
+
+
+
+    if (jacobians != NULL && jacobians[0] != NULL) {
+
+
+      //precompute some more stuff
+      double x_rot_2=p3d_only_rot[0]*2;
+      double y_rot_2=p3d_only_rot[1]*2;
+      double z_rot_2=p3d_only_rot[2]*2;
+
+      //block of rotation
+      jacobians[0][0]=x_z*y_rot_2;
+      jacobians[0][1]=_z* z_rot_2 + x_z*-x_rot_2;
+      jacobians[0][2]=_z*-y_rot_2;
+
+      jacobians[0][7]= _z*-z_rot_2 + y_z*y_rot_2;
+      jacobians[0][8]= y_z*-x_rot_2;
+      jacobians[0][9]= _z* x_rot_2;
+
+
+      //block of translation
+      jacobians[0][3]=_z;
+      jacobians[0][4]=0.0;
+      jacobians[0][5]=x_z;
+
+      jacobians[0][10]=0.0;
+      jacobians[0][11]=_z;
+      jacobians[0][12]=y_z;
+
+
+      //last two zeros
+      jacobians[0][6]=0.0;
+      jacobians[0][13]=0.0;
+
+    }
+
+    if (jacobians != NULL && jacobians[1] != NULL) {
+
+      //jacobian of p3d is of size 2x3 , fill in a row majow order jacobians[1][0...5]
+      jacobians[1][0]= _z*R_array[0] + x_z*R_array[6];
+      jacobians[1][1]= _z*R_array[1] + x_z*R_array[7];
+      jacobians[1][2]= _z*R_array[2] + x_z*R_array[8];
+
+      jacobians[1][3]= _z*R_array[3] + y_z*R_array[6];
+      jacobians[1][4]= _z*R_array[4] + y_z*R_array[7];
+      jacobians[1][5]= _z*R_array[5] + y_z*R_array[8];
+
+
+    }
+
+    if (jacobians != NULL && jacobians[2] != NULL) {
+
+      std::cout << "requiring jacobians of camera instrinsics" << '\n';
+
+    }
+
+    // exit(1);
+    return true;
+  }
+
+private:
+  double observed_x;
+  double observed_y;
+};
+
+
+
+
 class ToImagePlane : public SizedCostFunction<2, /* number of residuals */
                              7, /* size of first parameter, corresponding to the camera pose */
                              3 /* size of the second parameter corresponding to the point*/> {
@@ -176,50 +302,67 @@ class ToImagePlane : public SizedCostFunction<2, /* number of residuals */
     Eigen::Matrix3d R;
     double R_array[9];
     QuaternionToRotation(qvec,R_array);
-    R=Eigen::Map<Eigen::Matrix<double,3,3,Eigen::RowMajor> >(R_array);
-
-    Eigen::Vector3d g={p3d_only_rot[0],p3d_only_rot[1],p3d_only_rot[2]};
-    Eigen::Matrix3d g_hat;
-    g_hat << 0.0, -g(2), g(1),
-            g(2), 0.0, -g(0),
-            -g(1), g(0), 0.0;
-
-    Eigen::MatrixXd jacobian_normalization(2,3); jacobian_normalization.setZero();
-    jacobian_normalization(0,0)= -1/ p3d_local[2];
-    jacobian_normalization(1,1)= -1/ p3d_local[2];
-    jacobian_normalization(0,2)= p3d_local[0]/ (p3d_local[2]*p3d_local[2]);  //TODO precompute the power of 2
-    jacobian_normalization(1,2)= p3d_local[1]/ (p3d_local[2]*p3d_local[2]);
 
 
-    Eigen::MatrixXd jacobian_camera_translation(2,3);
-    jacobian_camera_translation= jacobian_normalization;
-
-    Eigen::MatrixXd jacobian_camera_rotation(2,3);
-    jacobian_camera_rotation=jacobian_normalization* (-g_hat*2);
-
-    Eigen::MatrixXd jacobian_p3d_global(2,3);
-    jacobian_p3d_global=jacobian_normalization*R;
-
-
-
-
+    //precompute stuff
+    double _z=-1.0/ p3d_local[2];
+    double z_2=p3d_local[2]*p3d_local[2];
+    double x_z=p3d_local[0]/ z_2;
+    double y_z=p3d_local[1]/ z_2;
 
 
     if (jacobians != NULL && jacobians[0] != NULL) {
 
+      // MatrixRef j_eigen(jacobians[0], 2, 7);
+      // j_eigen.setZero();
+      // j_eigen.block(0,0,2,3)= jacobian_camera_rotation;
+      // j_eigen.block(0,3,2,3)= jacobian_camera_translation;
 
-      MatrixRef j_eigen(jacobians[0], 2, 7);
-      j_eigen.setZero();
-      j_eigen.block(0,0,3,3)= jacobian_camera_rotation;
-      j_eigen.block(0,3,3,3)= jacobian_camera_translation;
+      //precompute some more stuff
+      double x_rot_2=p3d_only_rot[0]*2;
+      double y_rot_2=p3d_only_rot[1]*2;
+      double z_rot_2=p3d_only_rot[2]*2;
+
+      //block of rotation
+      jacobians[0][0]=x_z*y_rot_2;
+      jacobians[0][1]=_z* z_rot_2 + x_z*-x_rot_2;
+      jacobians[0][2]=_z*-y_rot_2;
+
+      jacobians[0][7]= _z*-z_rot_2 + y_z*y_rot_2;
+      jacobians[0][8]= y_z*-x_rot_2;
+      jacobians[0][9]= _z* x_rot_2;
+
+
+      //block of translation
+      jacobians[0][3]=_z;
+      jacobians[0][4]=0.0;
+      jacobians[0][5]=x_z;
+
+      jacobians[0][10]=0.0;
+      jacobians[0][11]=_z;
+      jacobians[0][12]=y_z;
+
+
+      //last two zeros
+      jacobians[0][6]=0.0;
+      jacobians[0][13]=0.0;
+
 
     }
 
     if (jacobians != NULL && jacobians[1] != NULL) {
 
-      //jacobian of p3d is of size 2x3 , fill in a row majow order jacobians[0][0...5]
-      MatrixRef j_eigen(jacobians[1], 2, 3);
-      j_eigen=jacobian_p3d_global;
+      //jacobian of p3d is of size 2x3 , fill in a row majow order jacobians[1][0...5]
+      jacobians[1][0]= _z*R_array[0] + x_z*R_array[6];
+      jacobians[1][1]= _z*R_array[1] + x_z*R_array[7];
+      jacobians[1][2]= _z*R_array[2] + x_z*R_array[8];
+
+      jacobians[1][3]= _z*R_array[3] + y_z*R_array[6];
+      jacobians[1][4]= _z*R_array[4] + y_z*R_array[7];
+      jacobians[1][5]= _z*R_array[5] + y_z*R_array[8];
+
+
+
     }
 
 
@@ -239,16 +382,15 @@ struct ErrorAnalyticalWithDistortion {
   }
 
   template <typename T>
-  bool operator()(const T* qvec,
+  bool operator()(const T* qtvec,
                   const T* p3d_global,
                   const T* cam_intrinsics,
                   T* residuals) const {
 
     T p_img_place[2];
-    (*compute_normalization_to_image_place)(qvec, p3d_global, p_img_place);
+    (*compute_normalization_to_image_place)(qtvec, p3d_global, p_img_place);
 
-    //NO DISTORSION
-    //TODO
+    //Distorsion
     const T& l1 = cam_intrinsics[1];
     const T& l2 = cam_intrinsics[2];
     const T r2 = p_img_place[0]*p_img_place[0] + p_img_place[1]*p_img_place[1];
@@ -280,7 +422,7 @@ struct ErrorAnalyticalWithDistortion {
               2, //2 residuals
               7,  //7 for rotation and translation
               3,  //3 for the 3D point
-              CAMERA_NR_INTRINSICS  //intrinsics of the camera (will be kept fixed)
+              CAMERA_NR_INTRINSICS  //intrinsics of the camera 
               >(
                 new ErrorAnalyticalWithDistortion( point2D)));
   }
