@@ -224,7 +224,8 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
 
     CostFunction* cost_function;
     // cost_function = ReprojectionErrorWithoutIntrinsics::Create(obs);
-    cost_function = new ErrorAnalytical(obs);
+    // cost_function = new ErrorAnalytical(obs);
+    cost_function = ErrorAnalyticalWithDistortion::Create(obs);
 
 
     // // Each observation correponds to a pair of a camera and a point
@@ -236,7 +237,7 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
     problem->AddResidualBlock(cost_function, NULL, cam_pose, point, cam_intrinsics);
 
     // problem->SetParameterBlockConstant(point);
-    problem->SetParameterBlockConstant(cam_intrinsics);
+    // problem->SetParameterBlockConstant(cam_intrinsics);
     // problem->SetParameterBlockConstant(cam_pose);
 
 
@@ -250,7 +251,6 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
   }
 
 
-  //TODO recheck if its correct
   //Set parametrization for quaternion
   // LocalParameterization* camera_parameterization= new ProductParameterization( new QuaternionParameterization(),
   //                              new IdentityParameterization(3));
