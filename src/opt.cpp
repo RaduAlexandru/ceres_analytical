@@ -227,8 +227,11 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
     CostFunction* cost_function;
     // cost_function = ReprojectionErrorWithoutIntrinsics::Create(obs);
     // cost_function = new ErrorAnalytical(obs);
-    // cost_function = ErrorAnalyticalWithDistortion::Create(obs);  //distorsion is autodiff, rest is analytica
-    cost_function = new ErrorAnalyticalOpt(obs); // same as error analytical but more optimized and whithout eigen
+    // cost_function = ErrorAnalyticalWithDistortion::Create(obs);  //whole projection is autodiff, rest is analytica
+    cost_function = new ErrorAnalyticalOpt(obs); // same as error analytical (therefore no instrinsics) but more optimized and whithout eigen
+
+    //last one where we use only distorsion with automatic and rest is analytical
+    // cost_function = ErrorAnalyticalWithDistortion2::Create(obs);  //distorsion is autodiff, rest is analytical (takes the same time as the other one)
 
 
     // // Each observation correponds to a pair of a camera and a point
