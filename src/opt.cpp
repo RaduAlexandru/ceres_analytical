@@ -6,12 +6,9 @@
 #include "ceres_analytical/bal_problem.h"
 #include "ceres_analytical/snavely_reprojection_error.h"
 
-#include "ceres_analytical/projection_analytical_error.h"
-#include "ceres_analytical/reprojection_error_without_intrinsics.h"
-#include "ceres_analytical/error_analytical.h"
 
+#include "ceres_analytical/error_analytical.h"
 #include "ceres_analytical/custom_pose_parametrization.h"
-#include "ceres_analytical/custom_local_parametrization.h"
 
 #include <chrono>
 
@@ -23,9 +20,6 @@ using namespace ceres;
 
 void BuildProblem(BALProblem* bal_problem, Problem* problem);
 void BuildProblemAnalytical(BALProblem* bal_problem, Problem* problem);
-
-void BuildProblemWithoutIntrinsics(BALProblem* bal_problem, Problem* problem);
-void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* problem);
 
 void report_camera_parameters(BALProblem& bal_problem);
 
@@ -55,18 +49,9 @@ int main(int argc, char** argv) {
 
   //create problem
   Problem problem(problem_options);
-  bal_problem.Normalize(); //TODO check if necesary
+  bal_problem.Normalize(); //TODO check
   // BuildProblem(&bal_problem, &problem);
-  // BuildProblemWithoutIntrinsics(&bal_problem, &problem);  //optimizes a problem only over poses and points, without the instrinsics of the camera
-
-  BuildProblemWithoutIntrinsicsAnalytical(&bal_problem, &problem);
-
-  // BuildProblemWithoutIntrinsicsSophus(&bal_problem, &problem);   //optimizes only poses and points, using sophus and eigen
-  // BuildProblemWithoutIntrinsicsSophusAnalytical(&bal_problem, &problem);  //optimizes poses, points, using sophus with analytical jacobian
-
-
-  // BuildProblemSophus(&bal_problem, &problem);  //builds problem using sophus
-  // BuildProblemAnalytical(&bal_problem, &problem);
+  BuildProblemAnalytical(&bal_problem, &problem);
 
 
   //solve
@@ -149,89 +134,11 @@ void BuildProblemAnalytical(BALProblem* bal_problem, Problem* problem){
   const double* observations = bal_problem->observations();
 
   for (int i = 0; i < bal_problem->num_observations(); ++i) {
-    CostFunction* cost_function;
-    cost_function = new ProjectionAnalyticalError(observations[2 * i + 0],
-                                                  observations[2 * i + 1]);
-
-
-    // // Each observation correponds to a pair of a camera and a point
-    // // which are identified by camera_index()[i] and point_index()[i]
-    // // respectively.
-    double* camera = cameras + camera_block_size * bal_problem->camera_index()[i];
-    double* point = points + point_block_size * bal_problem->point_index()[i];
-    problem->AddResidualBlock(cost_function, NULL, camera, point);
-  }
-
-}
-
-void BuildProblemWithoutIntrinsics(BALProblem* bal_problem, Problem* problem){
-
-  const int point_block_size = bal_problem->point_block_size();    //point is 3 parameters
-  const int camera_block_size = bal_problem->camera_block_size();  //camera is 9 parameters
-  double* points = bal_problem->mutable_points();
-  double* cameras = bal_problem->mutable_cameras();
-  const double* observations = bal_problem->observations();
-
-  for (int i = 0; i < bal_problem->num_observations(); ++i) {
     Eigen::Vector2d obs={observations[2 * i + 0], observations[2 * i + 1]};
 
     CostFunction* cost_function;
-    cost_function = ReprojectionErrorWithoutIntrinsics::Create(obs);
-
-
-    // // Each observation correponds to a pair of a camera and a point
-    // // which are identified by camera_index()[i] and point_index()[i]
-    // // respectively.
-    double* cam_pose = cameras + camera_block_size * bal_problem->camera_index()[i];
-    double* point = points + point_block_size * bal_problem->point_index()[i];
-    double* cam_intrinsics = cameras + camera_block_size * bal_problem->camera_index()[i] + 7;  //move +7 because of the quat paramerization
-    problem->AddResidualBlock(cost_function, NULL, cam_pose, point, cam_intrinsics);
-
-    problem->SetParameterBlockConstant(cam_intrinsics);
-
-
-    // std::cout << "num residuals " << cost_function->num_residuals() << '\n';
-    // std::cout << "number of parameter blocks " << cost_function->parameter_block_sizes().size() << '\n';  //Is 3 because we have 3 parameter blocks (pose,point3d,intrisnics)
-    // std::cout << "size of first parameter block " << cost_function->parameter_block_sizes()[0] << "\n";
-    // std::cout << "size of second parameter block " << cost_function->parameter_block_sizes()[1] << "\n";
-    // std::cout << "size of third parameter block " << cost_function->parameter_block_sizes()[2] << "\n";
-    // std::cout  << '\n';
-
-  }
-
-
-  //TODO recheck if its correct
-  //Set parametrization for quaternion
-  LocalParameterization* camera_parameterization =
-  new ProductParameterization( new QuaternionParameterization(),
-                               new IdentityParameterization(3));
-  for (int i = 0; i < bal_problem->num_cameras(); ++i) {
-    problem->SetParameterization(cameras + camera_block_size * i,
-                                 camera_parameterization);
-
-  }
-
-}
-
-void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* problem){
-
-  const int point_block_size = bal_problem->point_block_size();    //point is 3 parameters
-  const int camera_block_size = bal_problem->camera_block_size();  //camera is 9 parameters
-  double* points = bal_problem->mutable_points();
-  double* cameras = bal_problem->mutable_cameras();
-  const double* observations = bal_problem->observations();
-
-  for (int i = 0; i < bal_problem->num_observations(); ++i) {
-    Eigen::Vector2d obs={observations[2 * i + 0], observations[2 * i + 1]};
-
-    CostFunction* cost_function;
-    // cost_function = ReprojectionErrorWithoutIntrinsics::Create(obs);
-    // cost_function = new ErrorAnalytical(obs);
-    // cost_function = ErrorAnalyticalWithDistortion::Create(obs);  //whole projection is autodiff, rest is analytica
-    cost_function = new ErrorAnalyticalOpt(obs); // same as error analytical (therefore no instrinsics) but more optimized and whithout eigen
-
-    //last one where we use only distorsion with automatic and rest is analytical
-    // cost_function = ErrorAnalyticalWithDistortion2::Create(obs);  //distorsion is autodiff, rest is analytical (takes the same time as the other one)
+    cost_function = new ErrorAnalyticalOpt(obs); // Optimized code for analytical error without intrinsics
+    // cost_function = ErrorAnalyticalWithDistortion::Create(obs);  //distorsion is autodiff, rest is analytical
 
 
     // // Each observation correponds to a pair of a camera and a point
@@ -246,20 +153,10 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
     problem->SetParameterBlockConstant(cam_intrinsics);
     // problem->SetParameterBlockConstant(cam_pose);
 
-
-    // std::cout << "num residuals " << cost_function->num_residuals() << '\n';
-    // std::cout << "number of parameter blocks " << cost_function->parameter_block_sizes().size() << '\n';  //Is 3 because we have 3 parameter blocks (pose,point3d,intrisnics)
-    // std::cout << "size of first parameter block " << cost_function->parameter_block_sizes()[0] << "\n";
-    // std::cout << "size of second parameter block " << cost_function->parameter_block_sizes()[1] << "\n";
-    // std::cout << "size of third parameter block " << cost_function->parameter_block_sizes()[2] << "\n";
-    // std::cout  << '\n';
-
   }
 
 
-  //Set parametrization for quaternion
-  // LocalParameterization* camera_parameterization= new ProductParameterization( new QuaternionParameterization(),
-  //                              new IdentityParameterization(3));
+  //Set parametrization for the pose
   LocalParameterization* camera_parameterization =  new CustomPoseParameterization( );
   for (int i = 0; i < bal_problem->num_cameras(); ++i) {
     problem->SetParameterization(cameras + camera_block_size * i,
@@ -268,8 +165,6 @@ void BuildProblemWithoutIntrinsicsAnalytical(BALProblem* bal_problem, Problem* p
   }
 
 }
-
-
 
 void report_camera_parameters(BALProblem& bal_problem){
 
@@ -296,7 +191,5 @@ void report_camera_parameters(BALProblem& bal_problem){
 
     std::cout << "Transformation matrix is" << std::endl << Trans << '\n';
   }
-
-
 
 }
