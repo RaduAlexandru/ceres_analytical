@@ -6,7 +6,8 @@ namespace ceres{
                                         const double* delta,
                                         double* x_plus_delta) const {
 
-    //for the first part of x (corresponding to the quaternion)
+    //for the first part of x (corresponding to the quaternion), 
+    // taken from QuaternionLocalParametrization
     const double norm_delta =
         sqrt(delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]);
     if (norm_delta > 0.0) {
@@ -23,16 +24,11 @@ namespace ceres{
       }
     }
 
-
-
     //second part of x corresponding to the translation
     const double* x_translation= x+4;
     double* x_plus_delta_translation= x_plus_delta+4;
     const double* delta_translation = delta + 3;
     VectorRef(x_plus_delta_translation, 3) = ConstVectorRef(x_translation, 3) + ConstVectorRef(delta_translation, 3);
-
-
-
 
     return true;
   }
@@ -43,7 +39,7 @@ namespace ceres{
     // //JUST IDENTITY for use with ErrorAnalytical
     MatrixRef j_eigen(jacobian, 7, 6);
     j_eigen.setZero();
-    j_eigen.block(0,0,6,6)=Eigen::MatrixXd::Identity(6,6);
+    j_eigen.block(0,0,6,6).setIdentity(); //=Eigen::MatrixXd::Identity(6,6);
 
     return true;
   }
