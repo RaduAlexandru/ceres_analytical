@@ -9,9 +9,9 @@ namespace ceres{
 // projection function with fx,fy,cx,cy
 class ErrorAnalyticalOptK : public SizedCostFunction<2, /* number of residuals */
                              7, /* size of first parameter, corresponding to the camera pose */
-                             3 /* point size*/ >{ 
+                             3 /* point size*/ >{
  public:
-   ErrorAnalyticalOptK(const double* point2D, const double * intrinsics) 
+   ErrorAnalyticalOptK(const double* point2D, const double * intrinsics)
    : observed_x(point2D[0]), observed_y(point2D[1]), m_intrinsics ( intrinsics )
    {}
   virtual ~ErrorAnalyticalOptK() {}
@@ -52,64 +52,105 @@ class ErrorAnalyticalOptK : public SizedCostFunction<2, /* number of residuals *
     residuals[1] = predicted_y - observed_y;
     //std::cout << " residual is " << residuals[0] << ", " << residuals[1] << '\n';
 
+
+
+    //Blanco's notation
+    double fx=focal_x;
+    double fy=focal_y;
+    double gx=p3d_local[0];
+    double gy=p3d_local[1];
+    double gz=p3d_local[2];
+    double gx2=gx*gx;
+    double gy2=gy*gy;
+    double gz2=gz*gz;
+    Eigen::Matrix3d R;
+    double R_array[9];
+    QuaternionToRotation(qvec,R_array);
+    R=Eigen::Map<Eigen::Matrix<double,3,3,Eigen::RowMajor> >(R_array);
+
+    Eigen::MatrixXd jacobian_projection(2,3);
+    Eigen::MatrixXd jacobian_point3d(2,3);
+
+    jacobian_projection(0,0)=fx/gz;
+    jacobian_projection(0,1)=0.0;
+    jacobian_projection(0,2)=-gx/gz2*fx;
+
+    jacobian_projection(1,0)=0.0;
+    jacobian_projection(1,1)=fy/gz;
+    jacobian_projection(1,2)=-gy/gz2*fy;
+
+
     if ( jacobians != NULL )
     {
-       
+
+
       const double z_2 = p3d_local[2]*p3d_local[2];
       if ( jacobians[0] != NULL) {
-         
-         // THE PROBLEM IS within THE ROTATION!
-//          jacobians[0][0]= ;//-fxgx/gz2 * gy
-//          jacobians[0][1]= ;//gz*fx/gz+fxgx/gz2*gx
-//          jacobians[0][2]= ;//gy*fx/gz
-//          jacobians[0][7]=; //fy/gz*-gz+gy*(-fy*gy/gz2)=-fy-fy*gy2/gz2=-fy(1+gy2/gz2)
-//          jacobians[0][8]=; //gx*fy*gy/gz2
-//          jacobians[0][9]=; //gx*fy/gz
-         
-         // block of rotation x 
-         jacobians[0][0]= -focal_x *   p3d_local[0]*p3d_local[1]/z_2; // -fx*gx*gy/gz2
-         jacobians[0][1]=  focal_x *(1+p3d_local[0]*p3d_local[0]/z_2); //fx(1+*gx2/gy2)
-         jacobians[0][2]= -focal_x *   p3d_local[1]/p3d_local[2]; // -fx*gy/gz
-         
-         // translation x
-         jacobians[0][3]=  focal_x /   p3d_local[2];
-         jacobians[0][4]= 0.0;
-         jacobians[0][5]= -focal_x *   p3d_local[0] / z_2;
-         
-         // block or rotation y
-         jacobians[0][7]= -focal_y *(1+p3d_local[1]*p3d_local[1]/z_2); // -fy(1+gy2/gz2)
-         jacobians[0][8]=  focal_y *   p3d_local[0]*p3d_local[1]/z_2;//fy*gx*gy/gz2
-         jacobians[0][9]=  focal_y *   p3d_local[0]/p3d_local[2]; // fy*gx/gz
 
-         //block of translation y
-         jacobians[0][10]= 0.0;
-         jacobians[0][11]= focal_y /   p3d_local[2];
-         jacobians[0][12]=-focal_y *   p3d_local[1] / z_2;
-         
-         //last two zeros
-         jacobians[0][6] = 0.0;
-         jacobians[0][13]= 0.0;
+        // //jacobian of the pose (2x7)
+        // MatrixRef j_eigen(jacobians[0], 2, 7);
+        // j_eigen.setZero();
+        // Eigen::Vector3d g={p3d_only_rot[0],p3d_only_rot[1],p3d_only_rot[2]};
+        // Eigen::Matrix3d g_hat;
+        // g_hat << 0.0, -g(2), g(1),
+        //         g(2), 0.0, -g(0),
+        //         -g(1), g(0), 0.0;
+        //
+        // Eigen::MatrixXd right_side(3,7);
+        // right_side.setZero();
+        // right_side.block(0,0,3,3)=-g_hat*2;  //TODO why is it scaled down by a half?
+        // right_side.block(0,3,3,3)=Eigen::Matrix3d::Identity();
+        //
+        // j_eigen=jacobian_projection*right_side;
+
+
+
+        // //Without eigen matrices
+        // block of rotation x
+        jacobians[0][0]= -focal_x *   p3d_local[0]*p3d_only_rot[1]/z_2*2; // -fx*gx*gy/gz2
+        jacobians[0][1]=  focal_x/p3d_local[2]*p3d_only_rot[2]*2 + focal_x*p3d_local[0]/z_2*p3d_only_rot[0]*2;
+        jacobians[0][2]= -focal_x/p3d_local[2]*p3d_only_rot[1]*2;
+
+        // translation x
+        jacobians[0][3]=  focal_x /   p3d_local[2];
+        jacobians[0][4]= 0.0;
+        jacobians[0][5]= -focal_x *   p3d_local[0] / z_2;
+
+        // block or rotation y
+        jacobians[0][7]= -focal_y/p3d_local[2]*p3d_only_rot[2]*2 - focal_y*p3d_local[1]/z_2*p3d_only_rot[1]*2;
+        jacobians[0][8]= focal_y *   p3d_local[1]*p3d_only_rot[0]/z_2*2;//fy*gx*gy/gz2
+        jacobians[0][9]=  focal_y *   p3d_only_rot[0]/p3d_local[2]*2; // fy*gx/gz
+
+        //block of translation y
+        jacobians[0][10]= 0.0;
+        jacobians[0][11]= focal_y /   p3d_local[2];
+        jacobians[0][12]=-focal_y *   p3d_local[1] / z_2;
+
+        //last two zeros
+        jacobians[0][6] = 0.0;
+        jacobians[0][13]= 0.0;
+
+
+
 
       }
-      
+
       if ( jacobians[1] != NULL) {
          //precompute stuff
-         const double fx_z = focal_x / p3d_local[2];
-         const double fy_z = focal_y / p3d_local[2];
+         //jacobian of p3d is of size 2x3 , fill in a row majow order jacobians[0][0...5]
+       jacobian_point3d= jacobian_projection*R;
+       jacobians[1][0] = jacobian_point3d(0,0);
+       jacobians[1][1] = jacobian_point3d(0,1);
+       jacobians[1][2] = jacobian_point3d(0,2);
 
-         const double x_z = -focal_x * p3d_local[0]/ z_2;
-         const double y_z = -focal_y * p3d_local[1]/ z_2;
-      
-         double R_array[9];
-         QuaternionToRotation(qvec,R_array);
-         //jacobian of p3d is of size 2x3 , fill in a row majow order jacobians[1][0...5]
-         jacobians[1][0]= fx_z*R_array[0] + x_z*R_array[6];
-         jacobians[1][1]= fx_z*R_array[1] + x_z*R_array[7];
-         jacobians[1][2]= fx_z*R_array[2] + x_z*R_array[8];
+       jacobians[1][3] = jacobian_point3d(1,0);
+       jacobians[1][4] = jacobian_point3d(1,1);
+       jacobians[1][5] = jacobian_point3d(1,2);
 
-         jacobians[1][3]= fy_z*R_array[3] + y_z*R_array[6];
-         jacobians[1][4]= fy_z*R_array[4] + y_z*R_array[7];
-         jacobians[1][5]= fy_z*R_array[5] + y_z*R_array[8];
+
+
+
+
       }
     }
 
@@ -126,14 +167,14 @@ private:
 // Automatic Diff:
 class ErrorAutoDiffOptK {//: public SizedCostFunction<2, /* number of residuals */
                          //    7, /* size of first parameter, corresponding to the camera pose */
-                         //    3 /* point size */ >{ 
-          
+                         //    3 /* point size */ >{
+
  public:
-   ErrorAutoDiffOptK(const double* point2D, const double * intrinsics) 
+   ErrorAutoDiffOptK(const double* point2D, const double * intrinsics)
    : observed_x(point2D[0]), observed_y(point2D[1]), m_intrinsics ( intrinsics )
    {}
   virtual ~ErrorAutoDiffOptK() {}
-  
+
   template <typename T>
   bool operator()(const T* qtvec, const T* p3d_global, T* residuals) const {
     T p3d_only_rot[3]; //resulting point after only rotation but NOT translating
@@ -141,7 +182,7 @@ class ErrorAutoDiffOptK {//: public SizedCostFunction<2, /* number of residuals 
     //const T * p3d_global = parameters[1];//double p3d_global[3]={parameters[1][0],parameters[1][1],parameters[1][2]};  //3D points in world frame
     //const T * qvec = parameters[0];// double qvec[4] = { parameters[0][0], parameters[0][1], parameters[0][2], parameters[0][3] };  //Swap the w if it's an eigen quaternion
     const T* qvec = qtvec;
-    
+
     //rotate
     QuaternionRotatePoint(qvec,p3d_global,p3d_only_rot);
 
@@ -174,7 +215,7 @@ class ErrorAutoDiffOptK {//: public SizedCostFunction<2, /* number of residuals 
     // exit(1);
     return true;
   }
-  
+
   // Factory to hide the construction of the CostFunction object from
   // the client code.
   static ceres::CostFunction* Create(const double* point2D, const double* intrinsics) {
@@ -189,7 +230,7 @@ private:
   double observed_y;
   const double * m_intrinsics;
 };
-  
 
-  
+
+
 } //namespace ceres
